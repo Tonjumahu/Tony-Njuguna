@@ -1,0 +1,128 @@
+# Day 02 — Network Baseline
+
+**Purpose:** Record the starting hardware, operating systems, network configuration, and connectivity checks for my cybersecurity learning lab.
+
+> **Privacy note:** This is a public-safe version. Usernames, MAC addresses, system names, product IDs, and other unnecessary identifiers have been omitted. Private IP addresses are included only where useful for explaining the lab; replace them with placeholders if you prefer not to publish your home subnet.
+
+## 1. Lab machines and intended roles
+
+### Dell XPS 13 9350 — primary workstation
+
+| Item | Observed specification |
+|---|---|
+| Operating system | Windows 10 Home, version 22H2 (build 19045) |
+| Processor | Intel Core i5-6200U, 2 cores / 4 logical processors |
+| Installed RAM | 8 GB |
+| Firmware mode | UEFI |
+| Firmware virtualization | Enabled |
+| Network connection | Wi-Fi |
+| Local IPv4 address during test | `19*.1**.0.***` |
+| Subnet mask | `255.255.255.0` (`/24`) |
+| Default gateway | `192.1**.*.*` |
+| DNS servers | `8.8.8.8`, `8.8.4.4` |
+| Virtual networking | VirtualBox Host-Only adapter observed at `192.16*.**.*` |
+
+**Intended role:** Main learning workstation for documentation, networking tools, packet analysis, and lightweight virtual machines. Close unnecessary applications before starting VMs because available memory was low during the captured session.
+
+### HP Compaq dc7900 Small Form Factor — secondary machine
+
+| Item | Observed specification |
+|---|---|
+| Operating system | Windows 10 Pro, version 22H2 (build 19045) |
+| Processor | Intel Core 2 Duo E8400 at 3.00 GHz, 2 cores / 2 logical processors |
+| Installed RAM | 5 GB |
+| Firmware mode | Legacy BIOS |
+| Firmware virtualization | Reported disabled |
+| SLAT | Reported unavailable |
+| Network connection | Ethernet to the Tenda router |
+| Local IPv4 address during test | `192.168.0.**` |
+| Subnet mask | `255.255.255.0` (`/24`) |
+| Default gateway | `192.16*.*.*` |
+| DNS server shown by `ipconfig /all` | `192.1**.0.*` |
+
+**Intended role:** Secondary system for Windows administration and basic networking exercises. Due to its older CPU, limited RAM, and reported virtualization limitations, it is not the first choice for hosting multiple VMs.
+
+## 2. Network layout
+
+```text
+                     Internet
+                         |
+                  [Tenda router]
+                   192.168.0.1
+                    /         \
+           Wi-Fi  /             \ Ethernet
+                 /               \
+      [Dell XPS 13]          [HP Compaq]
+       192.168.0.1**         192.168.0.***
+```
+
+Both computers were assigned addresses in the `192.168.0.0/24` subnet. This normally allows them to communicate directly on the local network, subject to firewall rules and router/Wi-Fi isolation settings.
+
+## 3. Tests performed
+
+| Test | Dell | HP | Result / interpretation |
+|---|---|---|---|
+| `ping 127.0.0.1` | 4 sent, 4 received, 0% loss | 4 sent, 4 received, 0% loss | **Passed** on both. Local TCP/IP loopback responded. |
+| `ping 192.168.0.1` | 4 sent, 4 received, 0% loss; average 10 ms | 4 sent, 4 received, 0% loss; average 3 ms | **Passed** on both. Each computer reached the router during testing. |
+| `nslookup example.com` | Successful; DNS server `8.8.8.8`; returned IPv4 and IPv6 addresses | Successful; DNS server `192.168.0.1`; returned IPv4 and IPv6 addresses | **Passed** on both. Name resolution worked. |
+| `route print` | Completed; default route via `192.168.0.1` | Completed; default route via `192.168.0.1` | Default route observed on both. |
+| HP → Dell ping (`192.168.0.1**`) | ok. |
+| Dell → HP ping (`192.168.0.1**`) |ok. |
+
+### Notes on the results
+
+- A successful loopback ping tests the local computer's TCP/IP stack; it does not test the router or internet.
+- A successful gateway ping confirms that the computer can reach the router's local interface.
+- Successful `nslookup` results confirm DNS resolution for the tested name.
+- On the Dell, the router ping had one higher response time (33 ms); the other replies were 2–3 ms. This small sample is not enough to diagnose a persistent network problem.
+- On the hp, the router ping had one higher response time (33 ms); the other replies were 2–3 ms. This small sample is not enough to diagnose a persistent network problem.
+
+## 4. Router gateway vs. VirtualBox Host-Only adapter
+
+These are different interfaces for different purposes:
+
+- **Router default gateway — `192.168.0.1`:** The Tenda router forwards traffic from the local subnet to other networks, such as the internet. It is the default route shown on both computers.
+- **VirtualBox Host-Only adapter — `192.168.**.1` on the Dell:** A virtual interface used for communication between the host computer and VMs attached to the same host-only network. It is not the Tenda router and it has no default gateway in the captured configuration.
+
+The Dell's route table showed both networks:
+- Home LAN: `192.168.0.**/**`
+- VirtualBox host-only network: `192.168.**.0/**`
+
+For vulnerable practice targets, use an isolated virtual network or carefully configured host-only network. Do not bridge intentionally vulnerable machines onto the home network unless there is a specific, understood reason and suitable safeguards.
+
+## 5. Wireshark / packet-capture observations
+
+**Status: completed .**  Wireshark was installed  DNS capture was completed.
+
+The tasks below was competed using wireshark:
+1. Start a capture on the active Dell Wi-Fi interface.
+2. Run `nslookup example.com` in Command Prompt.
+3. Stop the capture and apply the display filter `dns`.
+4. Observe the DNS query and response for `example.com`.
+5. Record whether the query and response appeared, and save the capture locally as `day2-dns-lab.pcapng`.
+
+
+## 6. Commands used
+
+```cmd
+systeminfo
+ipconfig /all
+ping 127.0.0.1
+ping 192.1*.0.1
+nslookup example.com
+route print
+```
+
+For the pending inter-device test:
+
+```cmd
+:: Run on the Dell
+ping 192.168.0.1**
+
+:: Run on the HP
+ping 192.168.0.1**
+```
+
+
+
+**Current conclusion:** Basic local TCP/IP, router reachability, and DNS resolution worked on both computers. Inter-device ping is not yet fully diagnosed, and packet-capture status remains unconfirmed.
